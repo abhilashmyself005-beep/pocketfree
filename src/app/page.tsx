@@ -9,6 +9,7 @@ import { CategoryBreakdown } from '@/components/CategoryBreakdown';
 import { SavingsTracker } from '@/components/SavingsTracker';
 import { ReceiptUploader } from '@/components/ReceiptUploader';
 import { BankStatementImporter } from '@/components/BankStatementImporter';
+import { SmartShoppingOptimizer } from '@/components/SmartShoppingOptimizer';
 import {
   Transaction,
   calculateSpendVsIncome,
@@ -192,60 +193,9 @@ export default function DashboardPage() {
           <SavingsTracker lang={lang} />
         </div>
 
-        {/* Smart Saudi Retailer Preview Banner (Danube, Panda, Tamimi, Carrefour, Lulu) */}
-        <section className="glass-card rounded-2xl p-5 sm:p-6 border border-emerald-500/20 bg-gradient-to-r from-emerald-950/30 via-slate-900/60 to-slate-900/80 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                <ShoppingBag className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>{lang === 'ar' ? 'مقارنة أسعار المتاجر السعودية' : 'Saudi Smart Shopping & Price Match'}</span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                    Live Riyadh Catalog
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  {lang === 'ar'
-                    ? 'فحص سلة مقاضي الأسبوع بين أسواق الدانوب، بنده، التميمي، ولولو هايبرماركت'
-                    : 'Basket pricing comparison across Danube, Panda, Tamimi, Carrefour, and Lulu Hypermarket'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-400">
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Riyadh • North District</span>
-            </div>
-          </div>
-
-          {/* Quick Price Delta Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs">
-            <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <div className="text-slate-400 font-medium">Almarai Milk 2L</div>
-              <div className="text-white font-bold font-mono mt-0.5">11.00 SAR</div>
-              <div className="text-[10px] text-emerald-400 flex items-center gap-1">
-                <span>Danube vs Panda (-1.50 SAR)</span>
-              </div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <div className="text-slate-400 font-medium">Basmati Rice 5kg</div>
-              <div className="text-white font-bold font-mono mt-0.5">42.50 SAR</div>
-              <div className="text-[10px] text-emerald-400 flex items-center gap-1">
-                <span>Tamimi Promotion (-7.00 SAR)</span>
-              </div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <div className="text-slate-400 font-medium">Olive Oil 500ml</div>
-              <div className="text-white font-bold font-mono mt-0.5">26.95 SAR</div>
-              <div className="text-[10px] text-slate-400">Verified retail price</div>
-            </div>
-            <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <div className="text-slate-400 font-medium">Tissue Box (5-Pack)</div>
-              <div className="text-white font-bold font-mono mt-0.5">19.95 SAR</div>
-              <div className="text-[10px] text-emerald-400">Carrefour match</div>
-            </div>
-          </div>
+        {/* Module 5 & 6: Saudi Smart Shopping, Retailer Price Matching & Delivery Optimizer */}
+        <section>
+          <SmartShoppingOptimizer lang={lang} />
         </section>
 
         {/* Transaction Ledger Table with Search, Filter & Halala Display */}
