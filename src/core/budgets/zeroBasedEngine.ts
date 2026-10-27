@@ -108,6 +108,196 @@ export const INITIAL_DEBTS: DebtItem[] = [
   },
 ];
 
+export interface AllocationSegment {
+  name: string;
+  nameAr: string;
+  percentage: number;
+  color: string;
+  amountHalalas: bigint;
+}
+
+export const TOP_ALLOCATIONS: AllocationSegment[] = [
+  { name: 'Rent', nameAr: 'الإيجار', percentage: 37, color: '#2563EB', amountHalalas: 165000n }, // Blue
+  { name: 'Groceries', nameAr: 'المقاضي والبقالة', percentage: 15, color: '#16A34A', amountHalalas: 68000n }, // Dark Green
+  { name: 'Emergency fund', nameAr: 'صندوق الطوارئ', percentage: 11, color: '#0D9488', amountHalalas: 50000n }, // Teal
+  { name: '401(k) / Investment boost', nameAr: 'استثمار ونمو مالي', percentage: 10, color: '#38BDF8', amountHalalas: 45000n }, // Light Blue
+  { name: 'Road trip / Travel fund', nameAr: 'رحلة سفر وسياحة', percentage: 8, color: '#EA580C', amountHalalas: 36000n }, // Orange
+  { name: 'Auto loan', nameAr: 'تمويل السيارة', percentage: 8, color: '#6366F1', amountHalalas: 36000n }, // Indigo
+];
+
+export interface BudgetTarget {
+  id: string;
+  name: string;
+  nameAr: string;
+  category: string;
+  targetHalalas: bigint;
+  currentHalalas: bigint;
+  status: 'reached' | 'in_progress';
+  dueText: string;
+  iconName: string;
+}
+
+export const INITIAL_TARGETS: BudgetTarget[] = [
+  {
+    id: 'target_401k',
+    name: '401(k) / Investment Boost',
+    nameAr: 'الاستثمار والادخار التقاعدي',
+    category: 'savings',
+    targetHalalas: 225000n, // 2,250.00 SAR
+    currentHalalas: 225000n,
+    status: 'reached',
+    dueText: 'Open ended',
+    iconName: 'PiggyBank',
+  },
+  {
+    id: 'target_dining',
+    name: 'Dining & Coffee Out',
+    nameAr: 'المطاعم والقهوة',
+    category: 'dining',
+    targetHalalas: 19000n, // 190.00 SAR
+    currentHalalas: 19000n,
+    status: 'reached',
+    dueText: 'Any day',
+    iconName: 'Utensils',
+  },
+  {
+    id: 'target_yellowstone',
+    name: 'Road Trip to Asir / Yellowstone',
+    nameAr: 'رحلة عسير السياحية',
+    category: 'travel',
+    targetHalalas: 275000n, // 2,750.00 SAR
+    currentHalalas: 188000n, // 1,880.00 SAR (68%)
+    status: 'in_progress',
+    dueText: 'Open ended',
+    iconName: 'Car',
+  },
+  {
+    id: 'target_emergency',
+    name: 'Emergency Cushion 3-Months',
+    nameAr: 'صندوق الطوارئ 3 أشهر',
+    category: 'emergency',
+    targetHalalas: 1100000n, // 11,000.00 SAR
+    currentHalalas: 750000n, // 7,500.00 SAR (68%)
+    status: 'in_progress',
+    dueText: 'Open ended',
+    iconName: 'Shield',
+  },
+];
+
+export interface BillReminder {
+  id: string;
+  title: string;
+  titleAr: string;
+  payee: string;
+  amountHalalas: bigint;
+  group: 'tomorrow' | 'upcoming';
+  timeStr: string;
+  recurrence: string;
+  iconName: string;
+  isPaid: boolean;
+}
+
+export const INITIAL_BILL_REMINDERS: BillReminder[] = [
+  {
+    id: 'bill_rent_nov',
+    title: 'Rent',
+    titleAr: 'إيجار السكن',
+    payee: 'Landlord • Al-Malqa Apt',
+    amountHalalas: 165000n, // 1,650.00 SAR
+    group: 'tomorrow',
+    timeStr: 'Tomorrow • 8:00 AM',
+    recurrence: 'Monthly',
+    iconName: 'Home',
+    isPaid: false,
+  },
+  {
+    id: 'bill_utilities',
+    title: 'Utilities & Internet',
+    titleAr: 'الكهرباء والإنترنت المنزلي',
+    payee: 'Saudi Electricity Co & STC',
+    amountHalalas: 18000n, // 180.00 SAR
+    group: 'tomorrow',
+    timeStr: 'Tomorrow • 9:00 AM',
+    recurrence: 'Monthly',
+    iconName: 'Zap',
+    isPaid: false,
+  },
+  {
+    id: 'bill_auto_loan',
+    title: 'Auto Loan Financing',
+    titleAr: 'قسط تمويل السيارة',
+    payee: 'Al Rajhi Auto Lease',
+    amountHalalas: 42000n, // 420.00 SAR
+    group: 'upcoming',
+    timeStr: 'Sun 15 Nov • 9:00 AM',
+    recurrence: 'Monthly',
+    iconName: 'Car',
+    isPaid: false,
+  },
+];
+
+export interface HabitStreakState {
+  streakDays: number;
+  xp: number;
+  level: number;
+  freezesAvailable: number;
+  perfectWeeks: number;
+  habitDayProgress: number; // e.g. 12 of 66
+  weekDays: { name: string; checked: boolean; isToday?: boolean }[];
+  achievements: {
+    id: string;
+    title: string;
+    titleAr: string;
+    earnedDate: string;
+    icon: string;
+    badgeStyle: string;
+  }[];
+}
+
+export const INITIAL_HABIT_STREAK: HabitStreakState = {
+  streakDays: 12,
+  xp: 2460,
+  level: 6,
+  freezesAvailable: 1,
+  perfectWeeks: 2,
+  habitDayProgress: 12,
+  weekDays: [
+    { name: 'Mon', checked: true },
+    { name: 'Tue', checked: true },
+    { name: 'Wed', checked: true },
+    { name: 'Thu', checked: true },
+    { name: 'Fri', checked: true },
+    { name: 'Sat', checked: true },
+    { name: 'Sun', checked: true, isToday: true },
+  ],
+  achievements: [
+    {
+      id: 'ach_streak_star',
+      title: 'Streak Star',
+      titleAr: 'نجم الاستمرارية',
+      earnedDate: 'Earned on Oct 8, 2026',
+      icon: 'Stars',
+      badgeStyle: 'from-amber-400 to-orange-500',
+    },
+    {
+      id: 'ach_weekend_warrior',
+      title: 'Weekend Warrior',
+      titleAr: 'محارب عطلة الأسبوع',
+      earnedDate: 'Earned on Oct 18, 2026',
+      icon: 'ShieldAlert',
+      badgeStyle: 'from-purple-500 to-indigo-600',
+    },
+    {
+      id: 'ach_target_crusher',
+      title: 'Target Crusher',
+      titleAr: 'مقتنص الأهداف المالية',
+      earnedDate: 'Earned on Oct 24, 2026',
+      icon: 'Trophy',
+      badgeStyle: 'from-emerald-400 to-teal-600',
+    },
+  ],
+};
+
 /**
  * Calculates Unassigned / "Ready to Assign" Pool
  * Core Zero-Based Budgeting formula:
