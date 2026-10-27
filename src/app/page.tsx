@@ -13,6 +13,7 @@ import { SmartShoppingOptimizer } from '@/components/SmartShoppingOptimizer';
 import { BudgetAndPrivacyControls } from '@/components/BudgetAndPrivacyControls';
 import { FinArtExpenseTracker } from '@/components/FinArtExpenseTracker';
 import { ZeroBasedBudgetHub } from '@/components/ZeroBasedBudgetHub';
+import { MobileBottomNav } from '@/components/MobileBottomNav';
 import {
   Transaction,
   calculateSpendVsIncome,
@@ -161,9 +162,9 @@ export default function DashboardPage() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8 space-y-8">
         {/* Module 1: Personal Finance Dashboard & Spend-vs-Earn Analysis */}
-        <section className="space-y-4">
+        <section id="section-overview" className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -181,7 +182,7 @@ export default function DashboardPage() {
         </section>
 
         {/* FinArt Replica: Automatic Alert & Scheduled Bills Hub */}
-        <section>
+        <section id="section-finart-alerts">
           <FinArtExpenseTracker onAddTransaction={handleAddTransaction} lang={lang} />
         </section>
 
@@ -202,12 +203,12 @@ export default function DashboardPage() {
         </div>
 
         {/* Module 5 & 6: Saudi Smart Shopping, Retailer Price Matching & Delivery Optimizer */}
-        <section>
+        <section id="section-shopping-optimizer">
           <SmartShoppingOptimizer lang={lang} />
         </section>
 
         {/* Beyond Budget Replica: Zero-Based Envelope Budgeting & Debt Snowball */}
-        <section>
+        <section id="section-zero-based-envelopes">
           <ZeroBasedBudgetHub
             totalIncomeHalalas={analysis.totalIncome.amountHalalas > 0n ? analysis.totalIncome.amountHalalas : 2450000n}
             lang={lang}
@@ -215,12 +216,12 @@ export default function DashboardPage() {
         </section>
 
         {/* Module 7, 8, 9: Budget Recommendations, Regulated Investments & PDPL Privacy */}
-        <section>
+        <section id="section-budget-controls">
           <BudgetAndPrivacyControls transactions={transactions} lang={lang} />
         </section>
 
         {/* Transaction Ledger Table with Search, Filter & Halala Display */}
-        <section>
+        <section id="section-transactions">
           <TransactionLedger
             transactions={transactions}
             onDeleteTransaction={handleDeleteTransaction}
@@ -230,7 +231,7 @@ export default function DashboardPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-400 space-y-2">
+      <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-400 space-y-2 mb-16 md:mb-0">
         <p>
           Pocketfree • Saudi Personal Finance & Smart Shopping Platform • Built for precision in SAR & Halalas.
         </p>
@@ -238,6 +239,12 @@ export default function DashboardPage() {
           Complies with Saudi Personal Data Protection Law (PDPL) & ZATCA e-Invoicing standards.
         </p>
       </footer>
+
+      {/* Mobile Native Bottom Navigation Bar */}
+      <MobileBottomNav
+        onOpenAddModal={() => setIsAddModalOpen(true)}
+        lang={lang}
+      />
 
       {/* Manual Cash Income/Expense Entry Modal */}
       <AddTransactionModal
