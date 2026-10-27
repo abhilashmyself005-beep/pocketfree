@@ -11,6 +11,7 @@ import { ReceiptUploader } from '@/components/ReceiptUploader';
 import { BankStatementImporter } from '@/components/BankStatementImporter';
 import { SmartShoppingOptimizer } from '@/components/SmartShoppingOptimizer';
 import { BudgetAndPrivacyControls } from '@/components/BudgetAndPrivacyControls';
+import { FinArtExpenseTracker } from '@/components/FinArtExpenseTracker';
 import {
   Transaction,
   calculateSpendVsIncome,
@@ -176,6 +177,11 @@ export default function DashboardPage() {
           </div>
 
           <FinanceOverview analysis={analysis} lang={lang} />
+        </section>
+
+        {/* FinArt Replica: Automatic Alert & Scheduled Bills Hub */}
+        <section>
+          <FinArtExpenseTracker onAddTransaction={handleAddTransaction} lang={lang} />
         </section>
 
         {/* Ingestion Modules Grid: Bank Statement Ingestion & Private ZATCA Receipt OCR */}

@@ -1,0 +1,15 @@
+feature,area,priority,original,clone,notes
+Automatic SMS/Alert text parser,parser,must,yes,yes,Parses amount merchant date account from bank alerts (Arabic & English)
+Zero bank login credentials required,privacy,must,yes,yes,100% on-device localStorage privacy shield
+Multi-Account & Card Tracking,accounts,must,yes,yes,Support for Mada Credit Cards Digital Wallets and Cash
+Category-wise Monthly Budgets,budgets,must,yes,yes,Spending limits with 80% and 100% threshold visual alerts
+Bill & Subscription Due Reminders,bills,must,yes,yes,Recurring bill tracker with upcoming due date warnings
+Expense Categorization,ledger,must,yes,yes,Auto-tags Groceries Utilities Dining Transport etc.
+Duplicate Transaction Guard,ledger,must,yes,yes,Flags identical amounts and merchants within short window
+Cash Flow & Spending Breakdown Chart,analytics,should,yes,yes,Interactive visual charts for income vs expenses
+Export Data (CSV / JSON),privacy,should,yes,yes,Allows complete data export and encrypted offline backup
+Purge / Wipe Data Anytime,privacy,should,yes,yes,Single-click local database reset for complete privacy control
+Simulated Live Bank Feed Generator,testing,should,no,yes,Replica enhancement for testing live incoming bank alerts
+Receipt OCR Scanner Integration,ocr,could,no,yes,Pocketfree enhancement: upload store receipt image to extract items
+Smart Price Comparison / Store Deals,shopping,could,no,yes,Pocketfree enhancement: compare grocery prices across Panda Lulu Carrefour
+Native Android SMS Background Telephony,telephony,skip,yes,skip,Browser PWA uses alert listener and fast-paste parsing
