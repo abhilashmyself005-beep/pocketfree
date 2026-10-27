@@ -12,6 +12,7 @@ import { BankStatementImporter } from '@/components/BankStatementImporter';
 import { SmartShoppingOptimizer } from '@/components/SmartShoppingOptimizer';
 import { BudgetAndPrivacyControls } from '@/components/BudgetAndPrivacyControls';
 import { FinArtExpenseTracker } from '@/components/FinArtExpenseTracker';
+import { MonthlyDebitCreditCollation } from '@/components/MonthlyDebitCreditCollation';
 import { ZeroBasedBudgetHub } from '@/components/ZeroBasedBudgetHub';
 import { MobileBottomNav } from '@/components/MobileBottomNav';
 import { MobileAppShell } from '@/components/MobileAppShell';
@@ -127,10 +128,49 @@ export default function DashboardPage() {
   const [lang, setLang] = useState<'en' | 'ar'>('en');
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('mobile');
 
+  // Load user transactions from localStorage if previously saved
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pocketfree_user_transactions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setTransactions(
+            parsed.map((t: any) => ({
+              ...t,
+              amountHalalas: BigInt(t.amountHalalas),
+              date: new Date(t.date),
+              createdAt: t.createdAt ? new Date(t.createdAt) : new Date(t.date),
+            }))
+          );
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load transactions from localStorage', e);
+    }
+  }, []);
+
+  const saveToLocalStorage = (txs: Transaction[]) => {
+    try {
+      const serializable = txs.map((t) => ({
+        ...t,
+        amountHalalas: t.amountHalalas.toString(),
+      }));
+      localStorage.setItem('pocketfree_user_transactions', JSON.stringify(serializable));
+    } catch (e) {
+      console.error('Failed to save to localStorage', e);
+    }
+  };
+
   // Recalculate spend-vs-income analytics in Halala precision
   const analysis = useMemo(() => {
     return calculateSpendVsIncome(transactions);
   }, [transactions]);
+
+  const handleSetTransactions = (newTxs: Transaction[]) => {
+    setTransactions(newTxs);
+    saveToLocalStorage(newTxs);
+  };
 
   const handleAddTransaction = (newTx: Transaction) => {
     const isDuplicate = transactions.some((t) => t.fingerprint === newTx.fingerprint);
@@ -142,15 +182,21 @@ export default function DashboardPage() {
       );
       return;
     }
-    setTransactions((prev) => [newTx, ...prev]);
+    const updated = [newTx, ...transactions];
+    setTransactions(updated);
+    saveToLocalStorage(updated);
   };
 
   const handleImportTransactions = (newTxs: Transaction[]) => {
-    setTransactions((prev) => [...newTxs, ...prev]);
+    const updated = [...newTxs, ...transactions];
+    setTransactions(updated);
+    saveToLocalStorage(updated);
   };
 
   const handleDeleteTransaction = (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    const updated = transactions.filter((t) => t.id !== id);
+    setTransactions(updated);
+    saveToLocalStorage(updated);
   };
 
   return (
@@ -217,6 +263,7 @@ export default function DashboardPage() {
               onAddTransaction={handleAddTransaction}
               onDeleteTransaction={handleDeleteTransaction}
               onImportTransactions={handleImportTransactions}
+              onSetTransactions={handleSetTransactions}
               onOpenAddModal={() => setIsAddModalOpen(true)}
               lang={lang}
               onToggleLang={() => setLang((prev) => (prev === 'en' ? 'ar' : 'en'))}
@@ -241,6 +288,15 @@ export default function DashboardPage() {
             </div>
 
             <FinanceOverview analysis={analysis} lang={lang} />
+          </section>
+
+          {/* Monthly Collation & Phone SMS Auto-Sync */}
+          <section id="section-monthly-collation">
+            <MonthlyDebitCreditCollation
+              transactions={transactions}
+              onSetTransactions={handleSetTransactions}
+              lang={lang}
+            />
           </section>
 
           {/* FinArt Replica: Automatic Alert & Scheduled Bills Hub */}

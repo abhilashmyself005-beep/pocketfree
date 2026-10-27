@@ -25,6 +25,7 @@ import {
   ChevronDown,
   CheckCircle2,
   Zap,
+  Smartphone,
 } from 'lucide-react';
 import {
   Transaction,
@@ -36,8 +37,14 @@ import {
   createTransactionFromParsedSms,
   SAMPLE_SAUDI_BANK_SMS,
 } from '@/core/banking/smsAlertParser';
+import {
+  isNativeAndroidDevice,
+  fetchDeviceHistoricSms,
+  parseHistoricSmsToTransactions,
+} from '@/core/banking/phoneSmsBridge';
 import { ZeroBasedBudgetHub } from './ZeroBasedBudgetHub';
 import { FinArtExpenseTracker } from './FinArtExpenseTracker';
+import { MonthlyDebitCreditCollation } from './MonthlyDebitCreditCollation';
 import { SmartShoppingOptimizer } from './SmartShoppingOptimizer';
 import { BudgetAndPrivacyControls } from './BudgetAndPrivacyControls';
 import { ReceiptUploader } from './ReceiptUploader';
@@ -51,6 +58,7 @@ interface MobileAppShellProps {
   onAddTransaction: (tx: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
   onImportTransactions: (txs: Transaction[]) => void;
+  onSetTransactions?: (txs: Transaction[]) => void;
   onOpenAddModal: () => void;
   lang: 'en' | 'ar';
   onToggleLang: () => void;
@@ -62,6 +70,7 @@ export const MobileAppShell: React.FC<MobileAppShellProps> = ({
   onAddTransaction,
   onDeleteTransaction,
   onImportTransactions,
+  onSetTransactions,
   onOpenAddModal,
   lang,
   onToggleLang,
@@ -316,6 +325,17 @@ export const MobileAppShell: React.FC<MobileAppShellProps> = ({
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   type="button"
+                  onClick={() => {
+                    setActiveTab('alerts');
+                  }}
+                  className="col-span-2 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-900/30 transition cursor-pointer active:scale-95"
+                >
+                  <Smartphone className="w-4 h-4 text-white" />
+                  <span>{lang === 'ar' ? 'مزامنة رسائل الهاتف واحتساب الشهور 🔄' : 'Auto-Sync Phone SMS & Collate Months 🔄'}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleHomePasteSms}
                   className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/30 transition cursor-pointer active:scale-95"
                 >
@@ -433,6 +453,11 @@ export const MobileAppShell: React.FC<MobileAppShellProps> = ({
         {/* ========================================================= */}
         {activeTab === 'alerts' && (
           <div className="space-y-4 animate-in fade-in duration-200">
+            <MonthlyDebitCreditCollation
+              transactions={transactions}
+              onSetTransactions={onSetTransactions || onImportTransactions}
+              lang={lang}
+            />
             <FinArtExpenseTracker onAddTransaction={onAddTransaction} lang={lang} />
           </div>
         )}
