@@ -15,6 +15,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Pocketfree | Saudi Personal Finance & Smart Shopping",
   description: "Next-generation personal finance dashboard, Halala-precise cashflow tracking, and smart Saudi retailer price comparison.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Pocketfree",
+  },
 };
 
 export default function RootLayout({
