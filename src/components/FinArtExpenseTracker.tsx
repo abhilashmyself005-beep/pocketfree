@@ -99,10 +99,76 @@ export const FinArtExpenseTracker: React.FC<FinArtExpenseTrackerProps> = ({
   const [newBillDate, setNewBillDate] = useState('');
   const [showAddBillModal, setShowAddBillModal] = useState(false);
 
-  const handleParseSms = (text: string) => {
+  const [fallbackAmount, setFallbackAmount] = useState('');
+  const [fallbackMerchant, setFallbackMerchant] = useState('');
+  const [autoLogToLedger, setAutoLogToLedger] = useState(true);
+  const [incomingSimAlert, setIncomingSimAlert] = useState<{ bank: string; text: string; amount: string; merchant: string } | null>(null);
+
+  const handleParseSms = (text: string, isQuickAction = false) => {
     setRawSmsInput(text);
     const result = parseSaudiBankSmsAlert(text);
     setParsedResult(result);
+
+    // If autoLog is enabled and user pressed a preset or pasted clipboard, log directly
+    if (isQuickAction && autoLogToLedger && result && !result.isOtp) {
+      const tx = createTransactionFromParsedSms(result);
+      onAddTransaction(tx);
+      setSuccessToast(
+        lang === 'ar'
+          ? `⚡ تم القيد التلقائي الفوري: ${formatMoney(moneyFromHalalas(result.amountHalalas))} لدى ${result.merchant} (${result.category})`
+          : `⚡ Auto-Logged: ${formatMoney(moneyFromHalalas(result.amountHalalas))} at ${result.merchant} (${result.category})`
+      );
+      setTimeout(() => setSuccessToast(null), 4000);
+      setRawSmsInput('');
+      setParsedResult(null);
+    }
+  };
+
+  const handleSimulateIncomingSms = () => {
+    const randomPreset = SAMPLE_SAUDI_BANK_SMS[Math.floor(Math.random() * SAMPLE_SAUDI_BANK_SMS.length)];
+    const parsed = parseSaudiBankSmsAlert(randomPreset.smsText);
+
+    if (parsed) {
+      setIncomingSimAlert({
+        bank: parsed.bankName,
+        text: randomPreset.smsText,
+        amount: formatMoney(moneyFromHalalas(parsed.amountHalalas)),
+        merchant: parsed.merchant,
+      });
+
+      // Automatically add to ledger
+      const tx = createTransactionFromParsedSms(parsed);
+      onAddTransaction(tx);
+
+      setTimeout(() => {
+        setIncomingSimAlert(null);
+      }, 5000);
+    }
+  };
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        handleParseSms(text, true);
+        if (!autoLogToLedger) {
+          setSuccessToast(
+            lang === 'ar'
+              ? '✓ تم استخراج بيانات المعاملة من الحافظة! راجع التفاصيل أدناه واضغط تأكيد.'
+              : '✓ SMS alert extracted from clipboard! Review details and confirm below.'
+          );
+          setTimeout(() => setSuccessToast(null), 4000);
+        }
+      } else {
+        alert(lang === 'ar' ? 'الحافظة فارغة حالياً. انسخ رسالة بنكية أولاً.' : 'Clipboard is empty. Copy a bank SMS first.');
+      }
+    } catch {
+      alert(
+        lang === 'ar'
+          ? 'تعذر الوصول للحافظة تلقائياً. يرجى لصق النص يدوياً في المربع أدناه.'
+          : 'Clipboard access was blocked by browser. Please paste the SMS text into the box directly.'
+      );
+    }
   };
 
   const handleAddParsedToLedger = () => {
@@ -117,6 +183,39 @@ export const FinArtExpenseTracker: React.FC<FinArtExpenseTrackerProps> = ({
     setTimeout(() => setSuccessToast(null), 4000);
     setRawSmsInput('');
     setParsedResult(null);
+  };
+
+  const handleAddManualFallback = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountNum = parseFloat(fallbackAmount);
+    if (isNaN(amountNum) || amountNum <= 0) return;
+
+    const parsed: ParsedSmsResult = {
+      amountHalalas: BigInt(Math.round(amountNum * 100)),
+      type: 'expense',
+      merchant: fallbackMerchant.trim() || 'Custom Bank SMS',
+      category: 'other',
+      accountLabel: 'Mada / Credit Card',
+      bankName: 'Saudi Bank',
+      currency: 'SAR',
+      confidence: 'medium',
+      date: new Date(),
+      rawText: rawSmsInput,
+      notes: 'Manually verified bank SMS alert',
+    };
+
+    const tx = createTransactionFromParsedSms(parsed);
+    onAddTransaction(tx);
+    setSuccessToast(
+      lang === 'ar'
+        ? `✓ تم قيد المعاملة بنجاح: ${formatMoney(moneyFromHalalas(parsed.amountHalalas))}`
+        : `✓ Logged to ledger: ${formatMoney(moneyFromHalalas(parsed.amountHalalas))}`
+    );
+    setTimeout(() => setSuccessToast(null), 4000);
+    setRawSmsInput('');
+    setParsedResult(null);
+    setFallbackAmount('');
+    setFallbackMerchant('');
   };
 
   const handleToggleBillPaid = (billId: string) => {
@@ -247,6 +346,40 @@ export const FinArtExpenseTracker: React.FC<FinArtExpenseTrackerProps> = ({
         </div>
       </div>
 
+      {/* Real-time Simulated Incoming SMS Alert Banner */}
+      {incomingSimAlert && (
+        <div className="mx-6 mt-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-2xl border border-white/20 flex items-start justify-between gap-3 animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-md flex-shrink-0">
+              <MessageSquare className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/25">
+                  Incoming Bank SMS Alert
+                </span>
+                <span className="text-xs font-bold text-emerald-100">{incomingSimAlert.bank}</span>
+              </div>
+              <p className="text-sm font-black mt-0.5">
+                {incomingSimAlert.amount} at {incomingSimAlert.merchant}
+              </p>
+              <p className="text-xs text-emerald-100/80 line-clamp-1 mt-0.5 font-mono">
+                {incomingSimAlert.text}
+              </p>
+              <span className="text-[10px] font-semibold text-emerald-200 mt-1 inline-block">
+                ⚡ Parsed & logged to your budget ledger automatically!
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setIncomingSimAlert(null)}
+            className="text-white/70 hover:text-white p-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Success Notification Banner */}
       {successToast && (
         <div className="mx-6 mt-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs sm:text-sm flex items-center justify-between animate-in fade-in">
@@ -260,19 +393,55 @@ export const FinArtExpenseTracker: React.FC<FinArtExpenseTrackerProps> = ({
       {/* Tab 1: SMS Alert Parser */}
       {activeTab === 'sms' && (
         <div className="p-6 space-y-6">
+          {/* Controls Bar: Auto-Log Switch + Simulate Alert */}
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setAutoLogToLedger(!autoLogToLedger)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  autoLogToLedger
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}
+              >
+                <Zap className={`w-3.5 h-3.5 ${autoLogToLedger ? 'text-amber-400 fill-amber-400' : ''}`} />
+                <span>
+                  {autoLogToLedger
+                    ? (lang === 'ar' ? 'القيد التلقائي الفوري: مفعل ⚡' : 'Auto-Log to Ledger: ON ⚡')
+                    : (lang === 'ar' ? 'القيد التلقائي الفوري: معطل' : 'Auto-Log to Ledger: OFF')}
+                </span>
+              </button>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">
+                {lang === 'ar' ? 'يقيد المعاملات مباشرة دون الحاجة لضغط زر التأكيد' : 'Directly logs parsed alerts into transactions'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSimulateIncomingSms}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-md shadow-indigo-900/30 transition cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>{lang === 'ar' ? 'محاكاة وصول إشعار بنكي 📲' : 'Simulate Incoming SMS 📲'}</span>
+            </button>
+          </div>
+
           {/* Quick Preset Samples */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              {lang === 'ar'
-                ? 'تجربة فورية لنماذج إشعارات البنوك السعودية:'
-                : 'Test with Real Saudi Bank Notification Samples:'}
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                {lang === 'ar'
+                  ? 'تجربة فورية لنماذج إشعارات البنوك السعودية (اضغط للتجربة الفورية):'
+                  : '1-Tap Real Bank Alert Samples (Tap to auto-parse & log):'}
+              </label>
+            </div>
             <div className="flex flex-wrap gap-2">
               {SAMPLE_SAUDI_BANK_SMS.map((sample) => (
                 <button
                   key={sample.id}
-                  onClick={() => handleParseSms(sample.smsText)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/40 transition-all flex items-center gap-1.5"
+                  onClick={() => handleParseSms(sample.smsText, true)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/40 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <Zap className="w-3 h-3 text-amber-400" />
                   {lang === 'ar' ? sample.labelAr : sample.labelEn}
@@ -283,19 +452,31 @@ export const FinArtExpenseTracker: React.FC<FinArtExpenseTrackerProps> = ({
 
           {/* Interactive Parser Textarea */}
           <div className="space-y-2">
-            <label className="block text-xs font-medium text-slate-400">
-              {lang === 'ar'
-                ? 'أو الصق نص الإشعار البنكي الوارد هنا (الراجحي، الأهلي، الرياض، الإنماء، STC Pay):'
-                : 'Or Paste Incoming Bank SMS Text (Al Rajhi, SNB, Riyad, Alinma, STC Pay, Apple Pay):'}
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-slate-400">
+                {lang === 'ar'
+                  ? 'أو الصق نص الإشعار البنكي الوارد هنا (الراجحي، الأهلي، الرياض، الإنماء، STC Pay):'
+                  : 'Or Paste Incoming Bank SMS Text (Al Rajhi, SNB, Riyad, STC Pay, Apple Pay):'}
+              </label>
+              <button
+                type="button"
+                onClick={handlePasteClipboard}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition cursor-pointer shadow-sm active:scale-95"
+                title="Read from Clipboard"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{lang === 'ar' ? '📋 لصق من الحافظة وتحليل فوري' : '📋 Paste from Clipboard & Auto-Parse'}</span>
+              </button>
+            </div>
+
             <div className="relative">
               <textarea
                 value={rawSmsInput}
-                onChange={(e) => handleParseSms(e.target.value)}
+                onChange={(e) => handleParseSms(e.target.value, false)}
                 placeholder={
                   lang === 'ar'
                     ? 'مثال: مصرف الراجحي: شراء عبر نقاط البيع بمبلغ 145.50 ر.س لدى بنده ببطاقة مدى **8821...'
-                    : 'e.g. Al Rajhi Bank: Purchase of SAR 184.50 at Panda Supermarket with Mada card **8821...'
+                    : 'e.g. Al Rajhi Bank: Purchase of SAR 184.50 at Panda Supermarket with Mada card **8821... or Account debited by SAR 120.00'
                 }
                 rows={3}
                 className="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
@@ -306,7 +487,7 @@ export const FinArtExpenseTracker: React.FC<FinArtExpenseTrackerProps> = ({
                     setRawSmsInput('');
                     setParsedResult(null);
                   }}
-                  className="absolute top-2.5 right-2.5 text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800"
+                  className="absolute top-2.5 right-2.5 text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 cursor-pointer"
                 >
                   {lang === 'ar' ? 'مسح' : 'Clear'}
                 </button>
@@ -314,8 +495,25 @@ export const FinArtExpenseTracker: React.FC<FinArtExpenseTrackerProps> = ({
             </div>
           </div>
 
+          {/* OTP Warning Card */}
+          {parsedResult?.isOtp && (
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-3 animate-in fade-in">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block text-sm font-bold text-amber-200">
+                  {lang === 'ar' ? 'تم رصد رمز تحقق أمني (OTP)' : 'Security OTP / Verification Code Detected'}
+                </strong>
+                <p className="mt-1 text-slate-300">
+                  {lang === 'ar'
+                    ? 'هذه الرسالة تحتوي على رمز دخول أو تأكيد أمني وليست معاملة سحب مالي. يتجاهل النظام رموز التحقق لحماية خصوصيتك وأمان حسابك.'
+                    : 'This message is a login or payment verification OTP. Pocketfree ignores OTPs for security and only extracts financial transaction alerts.'}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Live Extracted Card */}
-          {parsedResult && (
+          {parsedResult && !parsedResult.isOtp && (
             <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-4 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wide">
@@ -362,12 +560,57 @@ export const FinArtExpenseTracker: React.FC<FinArtExpenseTrackerProps> = ({
               <div className="pt-2 flex justify-end">
                 <button
                   onClick={handleAddParsedToLedger}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition-all"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition-all cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   {lang === 'ar' ? 'تأكيد وإضافة لسجل المعاملات' : 'Confirm & Log to Ledger'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Fallback Entry Card for Unrecognized Format */}
+          {rawSmsInput.trim().length > 10 && !parsedResult && (
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-700 space-y-3 animate-in fade-in">
+              <div className="flex items-center gap-2 text-xs text-amber-400 font-semibold">
+                <AlertTriangle className="w-4 h-4" />
+                <span>
+                  {lang === 'ar'
+                    ? 'لم يتم التعرف على المبلغ تلقائياً من نص الرسالة. يمكنك إدخال المبلغ لقيدها مباشرة:'
+                    : 'Could not auto-detect amount from this text. Enter details below to log transaction:'}
+                </span>
+              </div>
+
+              <form onSubmit={handleAddManualFallback} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="Amount (e.g. 150.00)"
+                    value={fallbackAmount}
+                    onChange={(e) => setFallbackAmount(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Merchant name (optional)"
+                    value={fallbackMerchant}
+                    onChange={(e) => setFallbackMerchant(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <button
+                    type="submit"
+                    className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md cursor-pointer"
+                  >
+                    Log to Ledger
+                  </button>
+                </div>
+              </form>
             </div>
           )}
         </div>

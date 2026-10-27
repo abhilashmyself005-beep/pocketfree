@@ -10,6 +10,8 @@ import {
   FileText,
   AlertCircle,
   CheckCircle2,
+  Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 import {
   Transaction,
@@ -19,6 +21,7 @@ import {
   computeTransactionFingerprint,
 } from '@/core/transactions';
 import { moneyFromSarString, multiplyMoneyByBasisPoints, formatMoney } from '@/core/money';
+import { parseSaudiBankSmsAlert } from '@/core/banking/smsAlertParser';
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -41,6 +44,40 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [isTransfer, setIsTransfer] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [autofillSuccess, setAutofillSuccess] = useState<string | null>(null);
+
+  const handlePasteSmsAutofill = async () => {
+    setError(null);
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        setError(lang === 'ar' ? 'الحافظة فارغة حالياً. انسخ رسالة بنكية أولاً.' : 'Clipboard is empty. Copy a bank SMS first.');
+        return;
+      }
+      const parsed = parseSaudiBankSmsAlert(text);
+      if (parsed) {
+        if (parsed.isOtp) {
+          setError(lang === 'ar' ? 'النص المنسوخ هو رمز تحقق (OTP) وليس معاملة مالية.' : 'Copied text is an OTP code, not a transaction alert.');
+          return;
+        }
+        setAmountStr((Number(parsed.amountHalalas) / 100).toFixed(2));
+        setDescription(parsed.merchant);
+        setCategory(parsed.category);
+        setType(parsed.type);
+        setNotes(`Autofilled from ${parsed.bankName} SMS`);
+        setAutofillSuccess(
+          lang === 'ar'
+            ? `✓ تم استخراج البيانات تلقائياً: ${parsed.merchant} (${parsed.bankName})`
+            : `✓ Autofilled from ${parsed.bankName}: ${parsed.merchant}`
+        );
+        setTimeout(() => setAutofillSuccess(null), 4000);
+      } else {
+        setError(lang === 'ar' ? 'تعذر استخراج المبلغ من الرسالة. أدخل التفاصيل يدوياً.' : 'Could not detect an amount from clipboard text. Please type details manually.');
+      }
+    } catch {
+      setError(lang === 'ar' ? 'تم حظر الوصول للحافظة من المتصفح.' : 'Clipboard permission was blocked by your browser.');
+    }
+  };
 
   React.useEffect(() => {
     try {
@@ -155,15 +192,39 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           </button>
         </div>
 
+        {/* Quick Autofill via SMS Banner */}
+        <div className="mt-4 p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <MessageSquare className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{lang === 'ar' ? 'هل نسخت إشعاراً بنكياً؟' : 'Have a copied bank alert SMS?'}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handlePasteSmsAutofill}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition cursor-pointer shadow-sm active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>{lang === 'ar' ? 'لصق وتعبئة تلقائية' : 'Paste SMS Autofill'}</span>
+          </button>
+        </div>
+
+        {/* Autofill Success Banner */}
+        {autofillSuccess && (
+          <div className="mt-3 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center gap-2 text-emerald-300 text-xs animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>{autofillSuccess}</span>
+          </div>
+        )}
+
         {/* Error notification */}
         {error && (
-          <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-2 text-rose-400 text-xs">
+          <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-2 text-rose-400 text-xs animate-in fade-in">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           {/* Type Selector (Expense vs Income vs Transfer) */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">

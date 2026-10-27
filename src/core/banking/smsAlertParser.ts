@@ -14,9 +14,11 @@ export interface ParsedSmsResult {
   category: TransactionCategory;
   accountLabel: string;
   bankName: string;
+  currency: string;
   confidence: 'high' | 'medium' | 'low';
   date: Date;
   rawText: string;
+  isOtp?: boolean;
   notes?: string;
 }
 
@@ -64,6 +66,27 @@ export const SAMPLE_SAUDI_BANK_SMS: PresetSaudiSms[] = [
     labelAr: 'مصرف الراجحي - إيداع الراتب الشهري',
     smsText: 'مصرف الراجحي: تم إيداع راتب شهري بمبلغ 22,500.00 ر.س في حسابك الجاري **3920 من شركة التقنية المتقدمة. الرصيد الحالي: 28,450.00 ر.س',
   },
+  {
+    id: 'sms_english_card',
+    bank: 'International / Mada',
+    labelEn: 'English Card Alert - Carrefour',
+    labelAr: 'إشعار بطاقة بالإنجليزية - كارفور',
+    smsText: 'Your account ending in 4920 was debited by SAR 145.20 at Carrefour on 28-OCT-2026. Avail Bal: SAR 5,420.00',
+  },
+  {
+    id: 'sms_alinma_01',
+    bank: 'Alinma Bank',
+    labelEn: 'Alinma Bank - McDonald\'s Mada',
+    labelAr: 'مصرف الإنماء - ماكدونالدز مدى',
+    smsText: 'مصرف الإنماء: تم خصم مبلغ 48.00 ر.س من بطاقة مدى **1122 لدى ماكدونالدز فرع الرياض. الرصيد المتبقي: 3,920.00 ر.س',
+  },
+  {
+    id: 'sms_noon_01',
+    bank: 'Digital Pay',
+    labelEn: 'Noon Shopping - Mada Online',
+    labelAr: 'نون للتسوق الإلكتروني - مدى',
+    smsText: 'تم خصم 150.00 ريال من بطاقتك مدى لدى نون للتجارة الإلكترونية مرجع #NOON-9921.',
+  },
 ];
 
 /**
@@ -81,74 +104,180 @@ function normalizeDigits(str: string): string {
 export function parseSaudiBankSmsAlert(rawSms: string): ParsedSmsResult | null {
   if (!rawSms || rawSms.trim().length === 0) return null;
 
-  const normalized = normalizeDigits(rawSms);
+  const normalized = normalizeDigits(rawSms.trim());
+
+  // 1. Detect if this is an OTP / 2FA message instead of a financial transaction
+  const isOtp = /otp|one time password|verification code|رمز التحقق|رمز التأكيد|كود التحقق/i.test(normalized) &&
+    !/debited|credited|spent|خصم|شراء|إيداع/i.test(normalized);
+
+  if (isOtp) {
+    return {
+      amountHalalas: 0n,
+      type: 'expense',
+      merchant: 'Security OTP Verification',
+      category: 'other',
+      accountLabel: 'Verification Code',
+      bankName: 'Bank Security',
+      currency: 'SAR',
+      confidence: 'low',
+      date: new Date(),
+      rawText: rawSms,
+      isOtp: true,
+      notes: 'This message is a login/payment OTP verification code rather than a completed transaction.',
+    };
+  }
+
   let amountStr: string | null = null;
+  let detectedCurrency = 'SAR';
   let type: TransactionType = 'expense';
   let merchant = 'Unknown Merchant';
   let bankName = 'Saudi Bank';
   let accountLabel = 'Mada Card';
   let confidence: 'high' | 'medium' | 'low' = 'low';
 
-  // 1. Detect Bank
-  if (/alrajhi|الراجحي/i.test(normalized)) {
+  // 2. Detect Bank / Provider (order matters: specific names before general)
+  if (/al[\s\-]*rajhi|الراجحي/i.test(normalized)) {
     bankName = 'Al Rajhi Bank';
-  } else if (/snb|الأهلي|الاهلي/i.test(normalized)) {
-    bankName = 'SNB (AlAhli)';
-  } else if (/riyad|الرياض/i.test(normalized)) {
-    bankName = 'Riyad Bank';
   } else if (/alinma|الإنماء|الانماء/i.test(normalized)) {
     bankName = 'Alinma Bank';
-  } else if (/stc pay|stcpay|اس تي سي باي/i.test(normalized)) {
+  } else if (/\briyad(?!\s*city|\s*ksa|\s*saudi|\s*branch)\b|بنك الرياض/i.test(normalized)) {
+    bankName = 'Riyad Bank';
+  } else if (/snb|الأهلي|الاهلي|alahli/i.test(normalized)) {
+    bankName = 'SNB (AlAhli)';
+  } else if (/sab\b|saudi awwal|الأول|ساب/i.test(normalized)) {
+    bankName = 'SAB (Saudi Awwal Bank)';
+  } else if (/fransi|الفرنسي/i.test(normalized)) {
+    bankName = 'Banque Saudi Fransi';
+  } else if (/anb|العربي/i.test(normalized)) {
+    bankName = 'Arab National Bank';
+  } else if (/albilad|البلاد/i.test(normalized)) {
+    bankName = 'Bank Albilad';
+  } else if (/aljazira|الجزيرة/i.test(normalized)) {
+    bankName = 'Bank AlJazira';
+  } else if (/stc[\s\-]*pay|اس تي سي باي/i.test(normalized)) {
     bankName = 'STC Pay';
   } else if (/urpay|يورباي/i.test(normalized)) {
     bankName = 'Urpay';
+  } else if (/tiqmo|تكمو/i.test(normalized)) {
+    bankName = 'Tiqmo';
+  } else if (/apple pay/i.test(normalized)) {
+    bankName = 'Apple Pay';
+  } else if (/hdfc/i.test(normalized)) {
+    bankName = 'HDFC Bank';
+  } else if (/sbi\b|state bank/i.test(normalized)) {
+    bankName = 'State Bank of India';
+  } else if (/icici/i.test(normalized)) {
+    bankName = 'ICICI Bank';
+  } else if (/axis/i.test(normalized)) {
+    bankName = 'Axis Bank';
+  } else if (/kotak/i.test(normalized)) {
+    bankName = 'Kotak Bank';
+  } else if (/chase/i.test(normalized)) {
+    bankName = 'Chase Bank';
+  } else if (/wells fargo/i.test(normalized)) {
+    bankName = 'Wells Fargo';
+  } else if (/citi\b|citibank/i.test(normalized)) {
+    bankName = 'Citibank';
   }
 
-  // 2. Detect Transaction Type (Debit/Expense vs Credit/Income)
-  if (/إيداع|ايداع|راتب|deposit|salary|refund|استرداد|credit to/i.test(normalized)) {
+  // 3. Detect Currency
+  if (/ر\.س|ريال|sar/i.test(normalized)) {
+    detectedCurrency = 'SAR';
+  } else if (/usd|\$/i.test(normalized)) {
+    detectedCurrency = 'USD';
+  } else if (/eur|€/i.test(normalized)) {
+    detectedCurrency = 'EUR';
+  } else if (/gbp|£/i.test(normalized)) {
+    detectedCurrency = 'GBP';
+  } else if (/aed|درهم/i.test(normalized)) {
+    detectedCurrency = 'AED';
+  } else if (/rs\.?|inr|₹/i.test(normalized)) {
+    detectedCurrency = 'INR';
+  } else if (/kwd|دينار/i.test(normalized)) {
+    detectedCurrency = 'KWD';
+  }
+
+  // 4. Detect Transaction Type (Debit/Expense vs Credit/Income)
+  if (/إيداع|ايداع|راتب|deposit|salary|refund|استرداد|credited|credit to|received/i.test(normalized)) {
     type = 'income';
   } else {
     type = 'expense';
   }
 
-  // 3. Extract Amount
-  // Matches: "184.50 ر.س" or "SAR 184.50" or "بمبلغ 184.50" or "بقيمة 184.50" or "184.50 ريال"
+  // 5. Separate Available Balance text to prevent parsing the balance as transaction amount
+  // e.g. "Purchase 184.50. Avail Bal: 14,250.00" -> sanitize the balance out of primary search
+  const textWithoutBalance = normalized
+    .replace(/(?:avail(?:able)?(?:\s+(?:bal(?:ance)?|limit))?|الرصيد المتاح|الرصيد الحالي|الرصيد المتبقي|remaining|balance|avl\s*bal)\s*:?\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)?\s*[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?/gi, '');
+
+  // 6. Extract Transaction Amount with High-Resilience Regexes
   const amountRegexes = [
-    /(?:بمبلغ|بقيمة|مبلغ|قيمة|amount|paid|purchase of|transfer of)\s*:?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)\s*(?:ر\.س|ريال|sar)?/i,
-    /([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)\s*(?:ر\.س|ريال|sar)/i,
-    /(?:sar|rs)\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/i,
+    // Preceded by transaction keywords: "بمبلغ 184.50", "debited by 500", "spent SAR 120.00", "purchase of 45.00"
+    /(?:بمبلغ|بقيمة|مبلغ|قيمة|خصم|شراء|سداد|تحويل|debited\s*(?:by|for|with)?|spent|paid|purchase\s*(?:of|pos)?|charged\s*(?:with|for)?|transferred\s*(?:of)?|amount\s*(?:is|of)?)\s*:?\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/i,
+    // Accompanied by currency: "184.50 SAR", "184.50 ر.س", "SAR 184.50", "Rs 500.00", "500.00 ريال"
+    /(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/i,
+    /([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)/i,
+    // Generic fallback on text without balance: any decimal number like "145.50" or integer after bank word
+    /(?:at|to|لدى|صالح)\s+[^0-9\n]+\s+([0-9]+(?:\.[0-9]{1,2})?)/i,
+    /([0-9]+(?:\.[0-9]{2}))/i, // Clean decimal amount like 45.50
+    // Simple integer amount if above 0
+    /\b([1-9][0-9]{1,5})\b/i,
   ];
 
   for (const regex of amountRegexes) {
-    const match = normalized.match(regex);
+    const match = textWithoutBalance.match(regex) || normalized.match(regex);
     if (match && match[1]) {
-      // Remove commas from numbers like 4,500.00
-      amountStr = match[1].replace(/,/g, '');
-      break;
+      const cleaned = match[1].replace(/,/g, '');
+      const parsedNum = parseFloat(cleaned);
+      // Ensure it's not a card number suffix like 8821 or 2026 year
+      if (!isNaN(parsedNum) && parsedNum > 0 && parsedNum < 10000000 && parsedNum !== 2024 && parsedNum !== 2025 && parsedNum !== 2026) {
+        amountStr = cleaned;
+        break;
+      }
     }
   }
 
+  // If no amount was found, we can't classify as a financial transaction
   if (!amountStr) {
-    return null; // Cannot parse without a valid monetary amount
+    return null;
   }
 
-  // Convert to Halala bigint
+  // Convert to Halala bigint (1 SAR = 100 Halalas)
   const money = moneyFromSarString(amountStr);
   const amountHalalas = money.amountHalalas;
 
-  // 4. Extract Merchant / Narration
+  // 7. Extract Merchant / Narration
   const merchantRegexes = [
-    /(?:لدى|متجر|صالح|لصالح|from|at|to)\s*:?\s*([^.\n,]+?)(?:\s*(?:بواسطة|عبر|ببطاقة|بطاقة|في|ref|مرجع|رصيد|available|with|$))/i,
+    // UPI transfer pattern: UPI/P2M/Swiggy or UPI/Zomato or UPI/merchant
+    /upi\/(?:p2m\/)?([a-zA-Z0-9_\-]+)/i,
+    // Arabic patterns: لدى بنده, لصالح إيجار, متجر أمازون, في صيدلية النهدي
+    /(?:لدى|متجر|صالح|لصالح|في)\s*:?\s*([^.\n,]+?)(?:\s+(?:بواسطة|عبر|ببطاقة|بطاقة|مرجع|رصيد|available|with\b)|$)/i,
+    // Bill payment: سداد فاتورة STC Fiber or سداد مبلغ ... لدى/لصالح ...
+    /(?:سداد فاتورة|bill payment|سداد مبلغ[^\n]+?(?:لدى|لصالح)?)\s*:?\s*([^,.\n]+)/i,
+    // Spent on <Merchant>
+    /(?:spent|paid)\s+(?:sar|rs\.?|usd|\$)?\s*[0-9.]+\s+on\s+([a-zA-Z0-9_\-\s]+?)(?:\s+(?:using|with|via|card\b)|$)/i,
+    // English patterns: at Panda, towards Amazon Pay
+    /\b(?:at|towards)\s*:?\s*([^.\n,]+?)(?:\s+(?:on|with|using|ref\b|via|card|ending|avail|balance\b)|$)/i,
+    // to / for merchant (avoid capturing "to account")
+    /\b(?:to|for)\s+(?!a\/c|account|card)\s*:?\s*([^.\n,]+?)(?:\s+(?:on|with|using|ref\b|via|card|ending|avail|balance\b)|$)/i,
+    // POS purchase: شراء عبر نقاط البيع لدى بنده
     /(?:شراء|purchase)\s*:?\s*(?:عبر [^,]+)?\s*لدى\s+([^,.\n]+)/i,
-    /(?:سداد فاتورة|bill payment)\s*:?\s*([^,.\n]+)/i,
   ];
 
   for (const regex of merchantRegexes) {
     const match = normalized.match(regex);
     if (match && match[1]) {
-      const candidate = match[1].trim();
-      if (candidate.length > 2 && !/^[0-9]+$/.test(candidate)) {
-        merchant = candidate.replace(/^[:\-\s]+|[:\-\s]+$/g, '');
+      let candidate = match[1].trim();
+      // Clean up common prepositions and symbols
+      candidate = candidate.replace(/^(?:at|to|for|towards|on|لدى|في|متجر|صالح|لصالح)\s+/i, '');
+      candidate = candidate.replace(/^[:\-\s]+|[:\-\s]+$/g, '').trim();
+
+      // Ensure candidate isn't just an account number or date
+      if (
+        candidate.length > 2 &&
+        !/^[0-9\s\-_.]+$/.test(candidate) &&
+        !/^(mada|card|account|sar|usd|inr|rs)$/i.test(candidate)
+      ) {
+        merchant = candidate;
         confidence = 'high';
         break;
       }
@@ -157,16 +286,19 @@ export function parseSaudiBankSmsAlert(rawSms: string): ParsedSmsResult | null {
 
   if (merchant === 'Unknown Merchant') {
     if (type === 'income') {
-      merchant = 'Salary / Bank Transfer';
+      merchant = 'Payroll / Deposit';
       confidence = 'medium';
     } else {
-      merchant = bankName + ' Transaction';
+      merchant = `${bankName} POS Purchase`;
       confidence = 'medium';
     }
   }
 
-  // 5. Extract Card or Account Suffix
-  const cardMatch = normalized.match(/(?:بطاقة|البطاقة|حساب|الحساب|card|account|مدى)\s*(?:الائتمانية|ائتمانية|مدى)?\s*[:\*#\s]*([0-9]{4})/i);
+  // 8. Extract Card or Account Suffix
+  const cardMatch = normalized.match(/(?:بطاقة|البطاقة|حساب|الحساب|card|account|a\/c|ending in|ending|via mada|mada)\s*(?:الائتمانية|ائتمانية|مدى|mada)?\s*[:\*#\s]*([0-9]{4})/i) ||
+                    normalized.match(/card\s*([0-9]{4})/i) ||
+                    normalized.match(/(?:xx|\*\*|\*|x)([0-9]{4})/i);
+
   if (cardMatch && cardMatch[1]) {
     accountLabel = `${bankName} **${cardMatch[1]}`;
   } else if (/apple pay/i.test(normalized)) {
@@ -175,7 +307,7 @@ export function parseSaudiBankSmsAlert(rawSms: string): ParsedSmsResult | null {
     accountLabel = `${bankName} Account`;
   }
 
-  // 6. Automatically Categorize
+  // 9. Automatically Categorize
   const category = autoCategorizeSaudiMerchant(merchant + ' ' + rawSms);
 
   return {
@@ -185,9 +317,11 @@ export function parseSaudiBankSmsAlert(rawSms: string): ParsedSmsResult | null {
     category,
     accountLabel,
     bankName,
+    currency: detectedCurrency,
     confidence,
     date: new Date(),
     rawText: rawSms,
+    isOtp: false,
     notes: `Parsed automatically from ${bankName} SMS alert`,
   };
 }

@@ -72,6 +72,26 @@ describe('FinArt Replica: Saudi Bank SMS Alert Parser', () => {
     expect(tx.fingerprint).toBeDefined();
   });
 
+  it('parses English card debit alert with Available Balance stripped correctly', () => {
+    const text = 'Your account ending in 4920 was debited by SAR 145.20 at Carrefour on 28-OCT-2026. Avail Bal: SAR 5,420.00';
+    const parsed = parseSaudiBankSmsAlert(text);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.amountHalalas).toBe(14520n); // 145.20 SAR (NOT the 5,420.00 balance!)
+    expect(parsed?.type).toBe('expense');
+    expect(parsed?.merchant).toBe('Carrefour');
+    expect(parsed?.accountLabel).toContain('4920');
+  });
+
+  it('detects and flags OTP messages so they are not treated as financial spend', () => {
+    const text = 'Your one time password (OTP) is 849201 for logging in to Al Rajhi Mobile.';
+    const parsed = parseSaudiBankSmsAlert(text);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.isOtp).toBe(true);
+    expect(parsed?.amountHalalas).toBe(0n);
+  });
+
   it('returns null for invalid or empty text', () => {
     expect(parseSaudiBankSmsAlert('')).toBeNull();
     expect(parseSaudiBankSmsAlert('Hello without amount')).toBeNull();

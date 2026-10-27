@@ -23,12 +23,19 @@ import {
   Bell,
   PiggyBank,
   ChevronDown,
+  CheckCircle2,
+  Zap,
 } from 'lucide-react';
 import {
   Transaction,
   SpendVsIncomeAnalysis,
 } from '@/core/transactions';
 import { formatMoney, moneyFromHalalas } from '@/core/money';
+import {
+  parseSaudiBankSmsAlert,
+  createTransactionFromParsedSms,
+  SAMPLE_SAUDI_BANK_SMS,
+} from '@/core/banking/smsAlertParser';
 import { ZeroBasedBudgetHub } from './ZeroBasedBudgetHub';
 import { FinArtExpenseTracker } from './FinArtExpenseTracker';
 import { SmartShoppingOptimizer } from './SmartShoppingOptimizer';
@@ -62,6 +69,45 @@ export const MobileAppShell: React.FC<MobileAppShellProps> = ({
   const [activeTab, setActiveTab] = useState<MobileNavTab>('home');
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [smsToast, setSmsToast] = useState<string | null>(null);
+
+  const handleHomePasteSms = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        const parsed = parseSaudiBankSmsAlert(text);
+        if (parsed && !parsed.isOtp) {
+          const tx = createTransactionFromParsedSms(parsed);
+          onAddTransaction(tx);
+          setSmsToast(
+            lang === 'ar'
+              ? `⚡ تم استخراج المعاملة وقيدها تلقائياً: ${formatMoney(moneyFromHalalas(parsed.amountHalalas))} لدى ${parsed.merchant}`
+              : `⚡ Auto-Logged from SMS: ${formatMoney(moneyFromHalalas(parsed.amountHalalas))} at ${parsed.merchant}`
+          );
+          setTimeout(() => setSmsToast(null), 4000);
+          return;
+        }
+      }
+      setActiveTab('alerts');
+    } catch {
+      setActiveTab('alerts');
+    }
+  };
+
+  const handleHomeTestSms = (sampleIndex = 0) => {
+    const sample = SAMPLE_SAUDI_BANK_SMS[sampleIndex % SAMPLE_SAUDI_BANK_SMS.length];
+    const parsed = parseSaudiBankSmsAlert(sample.smsText);
+    if (parsed) {
+      const tx = createTransactionFromParsedSms(parsed);
+      onAddTransaction(tx);
+      setSmsToast(
+        lang === 'ar'
+          ? `⚡ تم قيد إشعار بنكي تجريبي: ${formatMoney(moneyFromHalalas(parsed.amountHalalas))} لدى ${parsed.merchant}`
+          : `⚡ Sample Alert Logged: ${formatMoney(moneyFromHalalas(parsed.amountHalalas))} at ${parsed.merchant}`
+      );
+      setTimeout(() => setSmsToast(null), 4000);
+    }
+  };
 
   const isPositiveCashflow = analysis.netCashflow.amountHalalas >= 0n;
 
@@ -236,6 +282,56 @@ export const MobileAppShell: React.FC<MobileAppShellProps> = ({
                 </div>
                 <span className="text-[10px] font-semibold mt-1">Envelopes</span>
               </button>
+            </div>
+
+            {/* Global SMS Toast Banner */}
+            {smsToast && (
+              <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in shadow-lg">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="font-semibold">{smsToast}</span>
+              </div>
+            )}
+
+            {/* Quick Bank SMS Auto-Tracker Card */}
+            <div className="rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/25 p-3.5 space-y-2.5 shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                    <MessageSquareCode className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">
+                      {lang === 'ar' ? 'المتتبع الآلي للإشعارات البنكية' : 'Bank SMS Alert Auto-Tracker'}
+                    </h4>
+                    <p className="text-[10px] text-slate-400">
+                      {lang === 'ar' ? 'انسخ أي إشعار بنكي من هاتفك واضغط للصق الفوري' : 'Copy any bank SMS alert and 1-tap paste to log'}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  FinArt Engine
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleHomePasteSms}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/30 transition cursor-pointer active:scale-95"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{lang === 'ar' ? '📋 لصق من الحافظة' : '📋 Paste from Clipboard'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleHomeTestSms(0)}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 transition cursor-pointer active:scale-95"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{lang === 'ar' ? '⚡ تجربة إشعار فوري' : '⚡ Test 1-Tap Sample'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Sinking Funds / Targets Quick Teaser */}
