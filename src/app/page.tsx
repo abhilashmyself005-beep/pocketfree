@@ -7,6 +7,7 @@ import { AddTransactionModal } from '@/components/AddTransactionModal';
 import { TransactionLedger } from '@/components/TransactionLedger';
 import { CategoryBreakdown } from '@/components/CategoryBreakdown';
 import { SavingsTracker } from '@/components/SavingsTracker';
+import { ReceiptUploader } from '@/components/ReceiptUploader';
 import {
   Transaction,
   calculateSpendVsIncome,
@@ -168,6 +169,11 @@ export default function DashboardPage() {
           </div>
 
           <FinanceOverview analysis={analysis} lang={lang} />
+        </section>
+
+        {/* Module 4: Cloudflare R2 Private Document Storage & ZATCA Receipt OCR */}
+        <section>
+          <ReceiptUploader onAddTransaction={handleAddTransaction} lang={lang} />
         </section>
 
         {/* Middle Two-Column Grid: Visual Distribution & Verified Savings Tracker */}
