@@ -10,6 +10,7 @@ import { SavingsTracker } from '@/components/SavingsTracker';
 import { ReceiptUploader } from '@/components/ReceiptUploader';
 import { BankStatementImporter } from '@/components/BankStatementImporter';
 import { SmartShoppingOptimizer } from '@/components/SmartShoppingOptimizer';
+import { BudgetAndPrivacyControls } from '@/components/BudgetAndPrivacyControls';
 import {
   Transaction,
   calculateSpendVsIncome,
@@ -196,6 +197,11 @@ export default function DashboardPage() {
         {/* Module 5 & 6: Saudi Smart Shopping, Retailer Price Matching & Delivery Optimizer */}
         <section>
           <SmartShoppingOptimizer lang={lang} />
+        </section>
+
+        {/* Module 7, 8, 9: Budget Recommendations, Regulated Investments & PDPL Privacy */}
+        <section>
+          <BudgetAndPrivacyControls transactions={transactions} lang={lang} />
         </section>
 
         {/* Transaction Ledger Table with Search, Filter & Halala Display */}
