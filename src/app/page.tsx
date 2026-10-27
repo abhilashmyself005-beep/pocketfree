@@ -8,6 +8,7 @@ import { TransactionLedger } from '@/components/TransactionLedger';
 import { CategoryBreakdown } from '@/components/CategoryBreakdown';
 import { SavingsTracker } from '@/components/SavingsTracker';
 import { ReceiptUploader } from '@/components/ReceiptUploader';
+import { BankStatementImporter } from '@/components/BankStatementImporter';
 import {
   Transaction,
   calculateSpendVsIncome,
@@ -138,6 +139,10 @@ export default function DashboardPage() {
     setTransactions((prev) => [newTx, ...prev]);
   };
 
+  const handleImportTransactions = (newTxs: Transaction[]) => {
+    setTransactions((prev) => [...newTxs, ...prev]);
+  };
+
   const handleDeleteTransaction = (id: string) => {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
   };
@@ -171,10 +176,15 @@ export default function DashboardPage() {
           <FinanceOverview analysis={analysis} lang={lang} />
         </section>
 
-        {/* Module 4: Cloudflare R2 Private Document Storage & ZATCA Receipt OCR */}
-        <section>
+        {/* Ingestion Modules Grid: Bank Statement Ingestion & Private ZATCA Receipt OCR */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <BankStatementImporter
+            existingTransactions={transactions}
+            onImportTransactions={handleImportTransactions}
+            lang={lang}
+          />
           <ReceiptUploader onAddTransaction={handleAddTransaction} lang={lang} />
-        </section>
+        </div>
 
         {/* Middle Two-Column Grid: Visual Distribution & Verified Savings Tracker */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
