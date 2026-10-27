@@ -127,6 +127,14 @@ export function parseSaudiBankSmsAlert(rawSms: string): ParsedSmsResult | null {
     };
   }
 
+  // 2. Strict Financial Action Verification (Reject appointment, delivery, room no, tracking SMS)
+  const isFinancialMessage =
+    /(?:خصم|شراء|سداد|تحويل|إيداع|ايداع|راتب|استرداد|مدفوعات|نقاط البيع|سريع|فاتورة|debited|credited|spent|paid|purchase|charged|transferred|withdrawal|refund|salary|pos purchase|payment of|bill payment)/i.test(normalized);
+
+  if (!isFinancialMessage) {
+    return null;
+  }
+
   let amountStr: string | null = null;
   let detectedCurrency = 'SAR';
   let type: TransactionType = 'expense';
@@ -135,7 +143,7 @@ export function parseSaudiBankSmsAlert(rawSms: string): ParsedSmsResult | null {
   let accountLabel = 'Mada Card';
   let confidence: 'high' | 'medium' | 'low' = 'low';
 
-  // 2. Detect Bank / Provider (order matters: specific names before general)
+  // 3. Detect Bank / Provider (order matters: specific names before general)
   if (/al[\s\-]*rajhi|الراجحي/i.test(normalized)) {
     bankName = 'Al Rajhi Bank';
   } else if (/alinma|الإنماء|الانماء/i.test(normalized)) {
@@ -180,7 +188,7 @@ export function parseSaudiBankSmsAlert(rawSms: string): ParsedSmsResult | null {
     bankName = 'Citibank';
   }
 
-  // 3. Detect Currency
+  // 4. Detect Currency
   if (/ر\.س|ريال|sar/i.test(normalized)) {
     detectedCurrency = 'SAR';
   } else if (/usd|\$/i.test(normalized)) {
@@ -197,46 +205,89 @@ export function parseSaudiBankSmsAlert(rawSms: string): ParsedSmsResult | null {
     detectedCurrency = 'KWD';
   }
 
-  // 4. Detect Transaction Type (Debit/Expense vs Credit/Income)
+  // 5. Detect Transaction Type (Debit/Expense vs Credit/Income)
   if (/إيداع|ايداع|راتب|deposit|salary|refund|استرداد|credited|credit to|received/i.test(normalized)) {
     type = 'income';
   } else {
     type = 'expense';
   }
 
-  // 5. Separate Available Balance text to prevent parsing the balance as transaction amount
-  // e.g. "Purchase 184.50. Avail Bal: 14,250.00" -> sanitize the balance out of primary search
+  // 6. Pre-Sanitize Non-Amount Numbers to prevent picking up card suffixes, phone numbers, refs, or dates
   const textWithoutBalance = normalized
-    .replace(/(?:avail(?:able)?(?:\s+(?:bal(?:ance)?|limit))?|الرصيد المتاح|الرصيد الحالي|الرصيد المتبقي|remaining|balance|avl\s*bal)\s*:?\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)?\s*[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?/gi, '');
+    // Available & Remaining Balance
+    .replace(/(?:avail(?:able)?(?:\s+(?:bal(?:ance)?|limit))?|الرصيد المتاح|الرصيد الحالي|الرصيد المتبقي|remaining|balance|avl\s*bal|avlbl\s*bal)\s*:?\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)?\s*[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?/gi, ' ')
+    // Phone & Helpline numbers (e.g. Call 920003344, 8001244455, +966...)
+    .replace(/(?:call|helpline|support|contact|toll\s*free|هاتف|اتصل|خدمة العملاء|customer care)\s*:?\s*[+0-9\s\-()]{5,15}/gi, ' ')
+    // Card & Account numbers (e.g. Card **8821, ending in 4920, A/c *1234, بطاقة **1122)
+    .replace(/(?:card|acct|account|a\/c|بطاقة|حساب|ending\s*in|ending|مدى|mada)\s*[:#\*\s]*[0-9]{4,16}/gi, ' ')
+    .replace(/(?:\*{2,4}|x{2,4})[0-9]{4}/gi, ' ')
+    // References & IDs (Ref #994821, UTR 5299482910, مفوتر 402919102, #AMZ881920)
+    .replace(/(?:ref|reference|txn|txnid|id|rrn|utr|auth|approval|code|مرجع|المرجع|مفوتر|فاتورة|رقم|invoice|bill)\s*[:#\s]*[a-zA-Z0-9\-_]{4,25}/gi, ' ')
+    .replace(/#[0-9a-zA-Z\-_]+/g, ' ')
+    .replace(/upi\/[a-zA-Z0-9_\-\/]+/gi, ' ')
+    // Dates & Times (2026-10-27, 28/10/2026, 14:32:00)
+    .replace(/\b[0-9]{4}[-/][0-9]{1,2}[-/][0-9]{1,2}\b/g, ' ')
+    .replace(/\b[0-9]{1,2}[-/][0-9]{1,2}[-/][0-9]{2,4}\b/g, ' ')
+    .replace(/\b[0-9]{1,2}:[0-9]{2}(?::[0-9]{2})?\s*(?:am|pm|صباحاً|مساءً)?\b/gi, ' ')
+    // 4-digit years
+    .replace(/\b(?:2024|2025|2026|2027)\b/g, ' ');
 
-  // 6. Extract Transaction Amount with High-Resilience Regexes
-  const amountRegexes = [
-    // Preceded by transaction keywords: "بمبلغ 184.50", "debited by 500", "spent SAR 120.00", "purchase of 45.00"
-    /(?:بمبلغ|بقيمة|مبلغ|قيمة|خصم|شراء|سداد|تحويل|debited\s*(?:by|for|with)?|spent|paid|purchase\s*(?:of|pos)?|charged\s*(?:with|for)?|transferred\s*(?:of)?|amount\s*(?:is|of)?)\s*:?\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/i,
-    // Accompanied by currency: "184.50 SAR", "184.50 ر.س", "SAR 184.50", "Rs 500.00", "500.00 ريال"
-    /(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/i,
-    /([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)/i,
-    // Generic fallback on text without balance: any decimal number like "145.50" or integer after bank word
-    /(?:at|to|لدى|صالح)\s+[^0-9\n]+\s+([0-9]+(?:\.[0-9]{1,2})?)/i,
-    /([0-9]+(?:\.[0-9]{2}))/i, // Clean decimal amount like 45.50
-    // Simple integer amount if above 0
-    /\b([1-9][0-9]{1,5})\b/i,
+  // 7. Strict Amount Regex Patterns with Probability
+  const amountPatterns: { regex: RegExp; prob: number; conf: 'high' | 'medium' }[] = [
+    // Preceded by verb + explicit currency: "بمبلغ 184.50 ر.س", "debited by SAR 145.20"
+    {
+      regex: /(?:بمبلغ|بقيمة|مبلغ|قيمة|خصم|شراء|سداد|تحويل|إيداع|debited\s*(?:by|for|with)?|spent\s*(?:of)?|paid|purchase\s*(?:of|pos)?|charged\s*(?:with|for)?|transferred\s*(?:of)?|credited\s*(?:with|by|for)?|amount\s*(?:is|of)?|withdrawn\s*(?:of)?)\s*:?\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/i,
+      prob: 95,
+      conf: 'high',
+    },
+    // Accompanied by currency: "SAR 184.50", "184.50 ر.س", "Rs. 350.00", "USD 29.99"
+    {
+      regex: /(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/i,
+      prob: 90,
+      conf: 'high',
+    },
+    {
+      regex: /([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)\s*(?:sar|ر\.س|ريال|rs\.?|inr|usd|\$|eur|€|aed)\b/i,
+      prob: 90,
+      conf: 'high',
+    },
+    // Preceded by financial verb without currency: "debited by 350.00", "بمبلغ 184.50", "خصم 150.00", "سداد 220"
+    {
+      regex: /(?:بمبلغ|بقيمة|مبلغ|قيمة|خصم|شراء|سداد|تحويل|إيداع|debited\s*(?:by|for|with)?|spent\s*(?:of)?|paid|purchase\s*(?:of|pos)?|charged\s*(?:with|for)?|transferred\s*(?:of)?|credited\s*(?:with|by|for)?|amount\s*(?:is|of)?|withdrawn\s*(?:of)?)\s*:?\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?)/i,
+      prob: 80,
+      conf: 'high',
+    },
+    // Decimal amount with exactly 2 decimal places in confirmed financial message: "145.20"
+    {
+      regex: /\b([0-9]{1,6}\.[0-9]{2})\b/i,
+      prob: 65,
+      conf: 'medium',
+    },
   ];
 
-  for (const regex of amountRegexes) {
-    const match = textWithoutBalance.match(regex) || normalized.match(regex);
+  for (const { regex, conf } of amountPatterns) {
+    const match = textWithoutBalance.match(regex);
     if (match && match[1]) {
       const cleaned = match[1].replace(/,/g, '');
       const parsedNum = parseFloat(cleaned);
-      // Ensure it's not a card number suffix like 8821 or 2026 year
-      if (!isNaN(parsedNum) && parsedNum > 0 && parsedNum < 10000000 && parsedNum !== 2024 && parsedNum !== 2025 && parsedNum !== 2026) {
+
+      if (
+        !isNaN(parsedNum) &&
+        parsedNum >= 0.01 &&
+        parsedNum <= 5000000 &&
+        parsedNum !== 2024 &&
+        parsedNum !== 2025 &&
+        parsedNum !== 2026 &&
+        parsedNum !== 2027
+      ) {
         amountStr = cleaned;
+        confidence = conf;
         break;
       }
     }
   }
 
-  // If no amount was found, we can't classify as a financial transaction
+  // If no validated amount was found, this message has 0 probability of being a spend event
   if (!amountStr) {
     return null;
   }

@@ -92,6 +92,22 @@ describe('FinArt Replica: Saudi Bank SMS Alert Parser', () => {
     expect(parsed?.amountHalalas).toBe(0n);
   });
 
+  it('returns null for non-financial messages containing numbers (room no, phone, dates)', () => {
+    // Non-financial SMS should NEVER parse random numbers as transaction amounts
+    expect(parseSaudiBankSmsAlert('Your appointment is confirmed for room 302 on 28-10-2026 at 14:30. Call 920003344')).toBeNull();
+    expect(parseSaudiBankSmsAlert('Your card ending 4567 is activated. For assistance call 8001244455.')).toBeNull();
+    expect(parseSaudiBankSmsAlert('Your order with tracking #9948210 is out for delivery. Contact courier at 0551234567.')).toBeNull();
+    expect(parseSaudiBankSmsAlert('Meeting rescheduled to 5pm in conference room 12. Contact ext 4402.')).toBeNull();
+  });
+
+  it('correctly extracts ONLY the transaction amount despite presence of card numbers, references, balances, and phone numbers', () => {
+    const complexAlert = 'مصرف الراجحي: شراء عبر نقاط البيع بمبلغ 184.50 ر.س لدى بنده ببطاقة مدى **8821. الرصيد: 14,250.00 ر.س. مرجع #99214. اتصل على 920003344 في 2026-10-27 14:32';
+    const parsed = parseSaudiBankSmsAlert(complexAlert);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.amountHalalas).toBe(18450n); // 184.50 SAR ONLY (NOT 8821, NOT 14250, NOT 99214, NOT 920003344)
+  });
+
   it('returns null for invalid or empty text', () => {
     expect(parseSaudiBankSmsAlert('')).toBeNull();
     expect(parseSaudiBankSmsAlert('Hello without amount')).toBeNull();
