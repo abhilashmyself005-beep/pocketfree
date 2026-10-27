@@ -12,6 +12,7 @@ import { BankStatementImporter } from '@/components/BankStatementImporter';
 import { SmartShoppingOptimizer } from '@/components/SmartShoppingOptimizer';
 import { BudgetAndPrivacyControls } from '@/components/BudgetAndPrivacyControls';
 import { FinArtExpenseTracker } from '@/components/FinArtExpenseTracker';
+import { ZeroBasedBudgetHub } from '@/components/ZeroBasedBudgetHub';
 import {
   Transaction,
   calculateSpendVsIncome,
@@ -203,6 +204,14 @@ export default function DashboardPage() {
         {/* Module 5 & 6: Saudi Smart Shopping, Retailer Price Matching & Delivery Optimizer */}
         <section>
           <SmartShoppingOptimizer lang={lang} />
+        </section>
+
+        {/* Beyond Budget Replica: Zero-Based Envelope Budgeting & Debt Snowball */}
+        <section>
+          <ZeroBasedBudgetHub
+            totalIncomeHalalas={analysis.totalIncome.amountHalalas > 0n ? analysis.totalIncome.amountHalalas : 2450000n}
+            lang={lang}
+          />
         </section>
 
         {/* Module 7, 8, 9: Budget Recommendations, Regulated Investments & PDPL Privacy */}
