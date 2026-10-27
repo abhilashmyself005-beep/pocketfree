@@ -7,6 +7,8 @@ import {
   Globe,
   PlusCircle,
   TrendingUp,
+  Smartphone,
+  Download,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -53,6 +55,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAddModal, lang, onToggleLa
 
         {/* Right Actions */}
         <div className="flex items-center gap-3">
+          {/* Android APK Download Badge */}
+          <a
+            href="/downloads/pocketfree.apk"
+            download="pocketfree.apk"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/30 transition shadow-sm"
+            title="Download Android APK"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Android APK</span>
+            <span className="sm:hidden">APK</span>
+          </a>
+
           {/* Language Toggle */}
           <button
             onClick={onToggleLang}
